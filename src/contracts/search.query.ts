@@ -7,4 +7,14 @@ export class SearchQuery {
   @IsString()
   @IsOptional()
   public search?: string;
+
+  @Expose()
+  @IsString()
+  @IsOptional()
+  public userId?: string;
+
+  @Expose()
+  @IsString()
+  @IsOptional()
+  public fridgeId?: string;
 }

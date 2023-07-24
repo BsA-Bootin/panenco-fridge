@@ -10,6 +10,17 @@ import { deleteAllProducts } from "../../controllers/users/handlers/delete.allpr
 import { getAllProducts } from "../../controllers/users/handlers/get.allproduct.handler";
 import { getProductsLocation } from "../../controllers/users/handlers/get.productsLocation.handler";
 import { giftAllProducts } from "../../controllers/users/handlers/gift.allproduct.handler";
+import { createRecipe } from "../../controllers/recipes/handlers/create.recipe.handler";
+import { Recipe } from "../../entities/recipe.entity";
+import { RecipeExtraView } from "../../contracts/recipe.view";
+import { deleteRecipe } from "../../controllers/recipes/handlers/delete.recipe.handler";
+import { getRecipe } from "../../controllers/recipes/handlers/get.recipe.handler";
+import { getAllRecipes } from "../../controllers/recipes/handlers/get.allrecipes.handler";
+import { getMissingIngredients } from "../../controllers/recipes/handlers/get.missingIngredients.handler";
+import { addIngredientsRecipe } from "../../controllers/recipes/handlers/add.ingredients.handler";
+import { nameRecipe } from "../../controllers/recipes/handlers/name.recipe.handler";
+import { FridgeProduct } from "../../entities/fridgeProduct.entity";
+import { Ingredient } from "../../entities/ingredients.entity";
 
 const userFixtures: User[] = [
     {
@@ -56,14 +67,33 @@ const productFixtures: Product[] = [
         name: 'milk',
         size: 5
     }   as Product,
-]
+    {
+        name: 'soda',
+        size: 2
+    }   as Product,
+];
 
-describe('User Handler Tests', () => {
+const recipeFixtures: Recipe[] = [
+    {
+        name: 'test name1',
+    }   as Recipe,
+    {
+        name: 'test name2',
+    }   as Recipe,
+];
+
+describe('Recipe Handler Tests', () => {
     let orm: MikroORM<PostgreSqlDriver>
     let users: User[]
     let fridges: Fridge[]
     let productBodys: {}[] = []
     let products: Product[]
+    let recipeBodys: {}[] = []
+    let recipes: Recipe[]
+    let fridgeProducts: FridgeProduct[]
+    let fridgeProductBodies = []
+    let ingredients: Ingredient[]
+    let ingredientBodies = []
     before(async () => {
         orm = await MikroORM.init(ormConfig);
     })
@@ -77,15 +107,36 @@ describe('User Handler Tests', () => {
         fridges = fridgeFixtures.map((x) => em.create(Fridge, x));
         await em.persistAndFlush(fridges);
         productBodys = [
-            {name: productFixtures[0].name, size: productFixtures[0].size, user: users[0].id, fridge: fridges[0].id},
-            {name: productFixtures[1].name, size: productFixtures[1].size, user: users[1].id, fridge: fridges[1].id},
-            {name: productFixtures[2].name, size: productFixtures[2].size, user: users[1].id, fridge: fridges[1].id},
-            {name: productFixtures[1].name, size: productFixtures[2].size, user: users[0].id, fridge: fridges[1].id}
+            {name: productFixtures[0].name, size: productFixtures[0].size},
+            {name: productFixtures[1].name, size: productFixtures[1].size},
+            {name: productFixtures[2].name, size: productFixtures[2].size},
+            {name: productFixtures[3].name, size: productFixtures[3].size},
         ]
         products = productBodys.map((x) => em.create(Product, x));
-        await em.persistAndFlush(products)
+        await em.persistAndFlush(products);
+        recipeBodys = [
+            {name: recipeFixtures[0].name, user: users[1].id}, 
+            {name: recipeFixtures[1].name, user: users[1].id},
+        ]
+        recipes = recipeBodys.map((x) => em.create(Recipe, x));
+        await em.persistAndFlush(recipes);
+        fridgeProductBodies = [
+            {user: users[0].id, fridge: fridges[0].id, product: products[3].id},
+            {user: users[1].id, fridge: fridges[1].id, product: products[2].id},
+            {user: users[1].id, fridge: fridges[1].id, product: products[1].id},
+        ]
+        fridgeProducts = fridgeProductBodies.map((x) => em.create(FridgeProduct, x));
+        await em.persistAndFlush(fridgeProducts)
+        ingredientBodies = [
+            {recipe: recipes[0].id, amount: '', product: products[0].id},
+            {recipe: recipes[0].id, amount: '', product: products[1].id},
+            {recipe: recipes[0].id, amount: '', product: products[2].id},
+            {recipe: recipes[0].id, amount: '', product: products[3].id},
+        ]
+        ingredients = ingredientBodies.map((x) => em.create(Ingredient, x))
+        await em.persistAndFlush(ingredients)
     });
-
+    
     it('create user', async () => {
         await RequestContext.createAsync(orm.em.fork(), async () => {
             const body = {
@@ -140,10 +191,10 @@ describe('User Handler Tests', () => {
 
     it('delete all user products', async () => {
         await RequestContext.createAsync(orm.em.fork(), async () => {
-            const initialCount = await orm.em.count(Product);
-            const count = await orm.em.count(Product, {user: users[0].id});
-            await deleteAllProducts(users[0].id);
-            const newCount = await orm.em.count(Product);
+            const initialCount = await orm.em.count(FridgeProduct);
+            const count = await orm.em.count(FridgeProduct, {user: users[1].id});
+            await deleteAllProducts(users[1].id);
+            const newCount = await orm.em.count(FridgeProduct);
             expect(initialCount - count).equals(newCount);
         });
     });
@@ -162,15 +213,15 @@ describe('User Handler Tests', () => {
 
     it('get all user products', async () => {
         await RequestContext.createAsync(orm.em.fork(), async () => {
-            const res = await getAllProducts(users[0].id);
+            const res = await getAllProducts(users[1].id);
 
             expect(res.length).equals(2)
             expect(res.some((x) => x.name === productFixtures[1].name)).true
-            expect(res.some((x) => x.name === productFixtures[0].name)).true
-            expect(res.some((x) => x.size === productFixtures[0].size)).true
+            expect(res.some((x) => x.name === productFixtures[2].name)).true
             expect(res.some((x) => x.size === productFixtures[2].size)).true
-            expect(res.some((x) => x.id === products[0].id)).true
-            expect(res.some((x) => x.id === products[3].id)).true
+            expect(res.some((x) => x.size === productFixtures[2].size)).true
+            expect(res.some((x) => x.id === products[1].id)).true
+            expect(res.some((x) => x.id === products[2].id)).true
         });
     });
 
@@ -188,12 +239,12 @@ describe('User Handler Tests', () => {
 
     it('get all user products at location', async () => {
         await RequestContext.createAsync(orm.em.fork(), async () => {
-            const res = await getProductsLocation(users[0].id, fridges[1].location.toString());
+            const res = await getProductsLocation(users[1].id, fridges[1].location.toString());
 
-            expect(res.length).equals(1)
+            expect(res.length).equals(2)
             expect(res.some((x) => x.name === productFixtures[1].name)).true
             expect(res.some((x) => x.size === productFixtures[2].size)).true
-            expect(res.some((x) => x.id === products[3].id)).true
+            expect(res.some((x) => x.id === products[1].id)).true
         });
     });
 
@@ -212,10 +263,10 @@ describe('User Handler Tests', () => {
     it('gift all Products', async () => {
         await RequestContext.createAsync(orm.em.fork(), async () => {
             const body = {receiver: users[0].id};
-            const initialCount = await orm.em.count(Product, {user: users[0].id})
-            const count = await orm.em.count(Product, {user: users[1].id})
+            const initialCount = await orm.em.count(FridgeProduct, {user: users[0].id})
+            const count = await orm.em.count(FridgeProduct, {user: users[1].id})
             await giftAllProducts(users[1].id, body);
-            const newCount = await orm.em.count(Product, {user: users[0].id})
+            const newCount = await orm.em.count(FridgeProduct, {user: users[0].id})
             expect(initialCount + count).equals(newCount);
         });
     });

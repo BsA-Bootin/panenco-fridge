@@ -2,6 +2,7 @@ import { BaseEntity, Collection, Entity, OneToMany, OneToOne, PrimaryKey, Proper
 import { v4 } from "uuid";
 import { Product } from "./product.entity";
 import { Recipe } from "./recipe.entity";
+import { FridgeProduct } from "./fridgeProduct.entity";
 
 @Entity()
 export class User extends BaseEntity<User, 'id'> {
@@ -17,8 +18,8 @@ export class User extends BaseEntity<User, 'id'> {
     @Property()
     public email: string;
 
-    @OneToMany('Product', 'user')
-    public products = new Collection<Product>(this);
+    @OneToMany('FridgeProduct', 'user')
+    public fridgeProducts = new Collection<FridgeProduct>(this);
 
     @OneToMany('Recipe', 'user')
     public recipes = new Collection<Recipe>(this);

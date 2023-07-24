@@ -5,9 +5,6 @@ import { User } from '../entities/user.entity';
 export class RecipeCreateBody {
     @IsString()
     public name: string;
-  
-    @IsString({each: true})
-    public ingredients: string[];
 
     @IsString()
     public user: string;
@@ -15,7 +12,7 @@ export class RecipeCreateBody {
 
 export class RecipeIngredients {
     @IsString({each: true})
-    public ingredients: string[];
+    public products: {productId: string, amount: string}[];
 }
 
 export class RecipeName {

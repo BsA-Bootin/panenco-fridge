@@ -9,5 +9,5 @@ export const getProductsLocation = async (userId: string, location: string) => {
     const fridgeIds = []
     const fridges = await em.find(Fridge, { location: Number(location) });
     fridges.map(fridge => fridgeIds.push(fridge.id));
-    return await em.find(Product, {user: userId, fridge: fridgeIds})
+    return await em.find(Product, {fridgeProducts: {user: userId, fridge: fridgeIds}})
 };

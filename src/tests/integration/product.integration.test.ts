@@ -6,11 +6,15 @@ import { login } from "../../controllers/auth/handlers/login.handler";
 import { MikroORM } from "@mikro-orm/core";
 import { PostgreSqlDriver } from "@mikro-orm/postgresql";
 import { User } from "../../entities/user.entity";
-import { ProductAddBody, ProductGiftBody } from "../../contracts/product.body";
+import { FridgeProductAddBody, ProductAddBody, ProductGiftBody } from "../../contracts/product.body";
 import { UserBody } from "../../contracts/user.body";
 import { FridgeBody } from "../../contracts/fridge.body";
 import { Product } from "../../entities/product.entity";
 import { Fridge } from "../../entities/fridge.entity";
+import { Recipe } from "../../entities/recipe.entity";
+import { FridgeProduct } from "../../entities/fridgeProduct.entity";
+import { Ingredient } from "../../entities/ingredients.entity";
+
 
 const userFixtures: User[] = [
     {
@@ -57,38 +61,80 @@ const productFixtures: Product[] = [
         name: 'milk',
         size: 5
     }   as Product,
-]
+    {
+        name: 'soda',
+        size: 2
+    }   as Product,
+];
 
-describe('Integration Product tests', () => {
+const recipeFixtures: Recipe[] = [
+    {
+        name: 'test name1',
+    }   as Recipe,
+    {
+        name: 'test name2',
+    }   as Recipe,
+];
+
+describe('Recipe Handler Tests', () => {
+    let orm: MikroORM<PostgreSqlDriver>
     let users: User[]
     let fridges: Fridge[]
     let productBodys: {}[] = []
     let products: Product[]
-
+    let recipeBodys: {}[] = []
+    let recipes: Recipe[]
+    let fridgeProducts: FridgeProduct[]
+    let fridgeProductBodies = []
+    let ingredients: Ingredient[]
+    let ingredientBodies = []
     let request: supertest.SuperTest<supertest.Test>;
-    let orm: MikroORM<PostgreSqlDriver>
+
     before(async () => {
-    const app = new App();
-    await app.createConnection();
-    orm = app.orm;
-    request = supertest(app.host);
-    });
+        const app = new App();
+        await app.createConnection();
+        orm = app.orm;
+        request = supertest(app.host);
+        });
 
     beforeEach(async () => {
-    await orm.em.execute(`DROP SCHEMA public CASCADE; CREATE SCHEMA public;`);
-    await orm.getMigrator().up();
-    const em = orm.em.fork();
-    users = userFixtures.map((x) => em.create(User, x));
-    await em.persistAndFlush(users);
-    fridges = fridgeFixtures.map((x) => em.create(Fridge, x));
-    await em.persistAndFlush(fridges);
-    productBodys = [
-        {name: productFixtures[2].name, size: productFixtures[2].size, user: users[1].id, fridge: fridges[1].id},
-        {name: productFixtures[1].name, size: productFixtures[2].size, user: users[0].id, fridge: fridges[1].id},
-    ]
-    products = productBodys.map((x) => em.create(Product, x));
-    await em.persistAndFlush(products)
-    })
+        await orm.em.execute(`DROP SCHEMA public CASCADE; CREATE SCHEMA public;`);
+        await orm.getMigrator().up();
+        const em = orm.em.fork();
+        users = userFixtures.map((x) => em.create(User, x));
+        await em.persistAndFlush(users);
+        fridges = fridgeFixtures.map((x) => em.create(Fridge, x));
+        await em.persistAndFlush(fridges);
+        productBodys = [
+            {name: productFixtures[0].name, size: productFixtures[0].size},
+            {name: productFixtures[1].name, size: productFixtures[1].size},
+            {name: productFixtures[2].name, size: productFixtures[2].size},
+            {name: productFixtures[3].name, size: productFixtures[3].size},
+        ]
+        products = productBodys.map((x) => em.create(Product, x));
+        await em.persistAndFlush(products);
+        recipeBodys = [
+            {name: recipeFixtures[0].name, user: users[1].id}, 
+            {name: recipeFixtures[1].name, user: users[1].id},
+        ]
+        recipes = recipeBodys.map((x) => em.create(Recipe, x));
+        await em.persistAndFlush(recipes);
+        fridgeProductBodies = [
+            {user: users[0].id, fridge: fridges[0].id, product: products[3].id},
+            {user: users[1].id, fridge: fridges[1].id, product: products[2].id},
+            {user: users[1].id, fridge: fridges[1].id, product: products[1].id},
+        ]
+        fridgeProducts = fridgeProductBodies.map((x) => em.create(FridgeProduct, x));
+        await em.persistAndFlush(fridgeProducts)
+        ingredientBodies = [
+            {recipe: recipes[0].id, amount: '', product: products[0].id},
+            {recipe: recipes[0].id, amount: '', product: products[1].id},
+            {recipe: recipes[0].id, amount: '', product: products[2].id},
+            {recipe: recipes[0].id, amount: '', product: products[3].id},
+        ]
+        ingredients = ingredientBodies.map((x) => em.create(Ingredient, x))
+        await em.persistAndFlush(ingredients)
+    });
 
     it('Test all product endpoints in sequence', async () => {
 
@@ -100,8 +146,6 @@ describe('Integration Product tests', () => {
         .send({
             name: 'testNameProduct1',
             size: 3,
-            user: users[0].id,
-            fridge: fridges[0].id,
         } as ProductAddBody)
         .expect(StatusCode.created);
 
@@ -126,15 +170,25 @@ describe('Integration Product tests', () => {
         .set('x-auth', 'api-key')
         .expect(StatusCode.created);
 
+        const { body: putProductResponse } = await request
+        .post(`/api/products/putInFridge/:${createProductResponse.id}`)
+        .send({
+            fridgeId: fridges[0].id,
+            userId: users[0].id,
+        } as FridgeProductAddBody)
+        .set('x-auth', 'api-key')
+        .expect(StatusCode.created);
 
         await request
         .patch(`/api/products/gift/${createProductResponse.id}`)
         .send({
             receiver: createUser2Response.id,
+            sender: users[0].id,
+            fridgeId: fridges[0].id,
         } as ProductGiftBody)
         .expect(StatusCode.ok);
 
-        const product = await em.findOne(Product, createProductResponse.id)
+        const product = await em.findOne(FridgeProduct, createProductResponse.id)
         const newOwner = await em.findOne(User, createUser2Response.id)
         expect(newOwner.id).equal(product.user.id);
 

@@ -3,7 +3,7 @@ import { Delete, Get, JsonController, Param, Patch, Post } from 'routing-control
 import { ArrayRepresenter, Body, Query, Representer, StatusCode } from '@panenco/papi';
 import { UserView } from '../../contracts/user.view';
 import { OpenAPI } from 'routing-controllers-openapi';
-import { ProductExtraView, ProductView } from '../../contracts/product.view';
+import {ProductView } from '../../contracts/product.view';
 import { SearchQuery } from '../../contracts/search.query';
 import { RecipeCreateBody, RecipeIngredients, RecipeName } from '../../contracts/recipe.body';
 import { createRecipe } from './handlers/create.recipe.handler';

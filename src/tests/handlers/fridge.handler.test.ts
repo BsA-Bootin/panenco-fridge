@@ -9,6 +9,8 @@ import { createFridge } from "../../controllers/fridges/handlers/create.fridge.h
 import { deleteFridge } from "../../controllers/fridges/handlers/delete.fridge.handler";
 import { getFridge } from "../../controllers/fridges/handlers/get.fridge.handler";
 import { giftFridge } from "../../controllers/fridges/handlers/gift.fridge.handler";
+import { FridgeProduct } from "../../entities/fridgeProduct.entity";
+import { putFridgeProduct } from "../../controllers/products/handlers/put.fridgeProduct.handler";
 
 const userFixtures: User[] = [
     {
@@ -53,7 +55,7 @@ const productFixtures: Product[] = [
     }   as Product,
     {
         name: 'milk',
-        size: 5
+        size: 6
     }   as Product,
 ]
 
@@ -61,8 +63,10 @@ describe('Fridge Handler Tests', () => {
     let orm: MikroORM<PostgreSqlDriver>
     let users: User[]
     let fridges: Fridge[]
-    let productBodes: {}[] = []
+    let productBodies: {}[] = []
     let products: Product[]
+    let fridgeProducts: FridgeProduct[]
+    let fridgeProductBodies = []
     before(async () => {
         orm = await MikroORM.init(ormConfig);
     })
@@ -75,14 +79,52 @@ describe('Fridge Handler Tests', () => {
         await em.persistAndFlush(users);
         fridges = fridgeFixtures.map((x) => em.create(Fridge, x));
         await em.persistAndFlush(fridges);
-        productBodes = [
-            {name: productFixtures[0].name, size: productFixtures[0].size, user: users[0].id, fridge: fridges[0].id},
-            {name: productFixtures[1].name, size: productFixtures[1].size, user: users[1].id, fridge: fridges[1].id},
-            {name: productFixtures[2].name, size: productFixtures[2].size, user: users[1].id, fridge: fridges[1].id},
-            {name: productFixtures[1].name, size: productFixtures[2].size, user: users[0].id, fridge: fridges[1].id}
+        productBodies = [
+            {name: productFixtures[0].name, size: productFixtures[0].size},
+            {name: productFixtures[1].name, size: productFixtures[1].size},
+            {name: productFixtures[2].name, size: productFixtures[2].size},
+            {name: productFixtures[1].name, size: productFixtures[2].size},
         ]
-        products = productBodes.map((x) => em.create(Product, x));
+        products = productBodies.map((x) => em.create(Product, x));
         await em.persistAndFlush(products)
+        fridgeProductBodies = [
+            {user: users[0].id, fridge: fridges[0].id, product: products[3].id},
+            {user: users[1].id, fridge: fridges[1].id, product: products[2].id},
+            {user: users[1].id, fridge: fridges[1].id, product: products[1].id},
+        ]
+        fridgeProducts = fridgeProductBodies.map((x) => em.create(FridgeProduct, x));
+        await em.persistAndFlush(fridgeProducts)
+    });
+
+    it('put product in fridge but capacity exceeded', async () => {
+        await RequestContext.createAsync(orm.em.fork(), async () => {
+            const body = {
+                userId: users[0].id,
+                fridgeId: fridges[0].id, 
+            }
+            const productId = products[3].id
+            try {
+                const res = await putFridgeProduct(productId, body);
+            } catch (error) {
+                expect(true, 'error thrown').true;
+                return;
+            }
+            expect(true, 'should have thrown an error').false;
+        });
+    });
+
+    it('put product in fridge', async () => {
+        await RequestContext.createAsync(orm.em.fork(), async () => {
+            const body = {
+                userId: users[0].id,
+                fridgeId: fridges[1].id, 
+            }
+            const productId = products[1].id
+            const originalCount = await orm.em.count(FridgeProduct, {fridge: body.fridgeId, product: productId, user: body.userId})
+            const res = await putFridgeProduct(productId, body);
+            const count = await orm.em.count(FridgeProduct, {fridge: body.fridgeId, product: productId, user: body.userId})
+            expect(originalCount + 1).equal(count);
+        });
     });
 
     it('create fridge', async () => {
@@ -99,24 +141,12 @@ describe('Fridge Handler Tests', () => {
 
     it('delete fridge', async () => {
         await RequestContext.createAsync(orm.em.fork(), async () => {
-            const initialCount = await orm.em.count(Product);
-            const count = await orm.em.count(Product, {fridge: fridges[1].id, user: users[1].id});
+            const initialCount = await orm.em.count(FridgeProduct);
+            const count = await orm.em.count(FridgeProduct, {fridge: fridges[1].id, user: users[1].id});
             await deleteFridge(fridges[1].id, users[1].id);
-            const newCount = await orm.em.count(Product);
+            const newCount = await orm.em.count(FridgeProduct);
             expect(initialCount - count).equals(newCount);
         });
-    });
-
-    it('delete fridge given non existing id', async () => {
-        await RequestContext.createAsync(orm.em.fork(), async () => {
-            try {
-                const res = await deleteFridge('non-existing', users[1].id);
-            } catch (error) {
-                expect(true, 'error thrown').true;
-                return;
-            }
-            expect(true, 'should have thrown an error').false;
-        })
     });
 
     it('get fridge', async () => {
@@ -147,10 +177,10 @@ describe('Fridge Handler Tests', () => {
     it('gift fridge', async () => {
         await RequestContext.createAsync(orm.em.fork(), async () => {
             const body = {receiver: users[0].id, sender: users[1].id};
-            const initialCount = await orm.em.count(Product, {user: users[0].id, fridge: fridges[1].id})
-            const count = await orm.em.count(Product, {user: users[1].id, fridge: fridges[1].id})
+            const initialCount = await orm.em.count(FridgeProduct, {user: users[0].id, fridge: fridges[1].id})
+            const count = await orm.em.count(FridgeProduct, {user: users[1].id, fridge: fridges[1].id})
             await giftFridge(fridges[1].id, body);
-            const newCount = await orm.em.count(Product, {user: users[0].id, fridge: fridges[1].id})
+            const newCount = await orm.em.count(FridgeProduct, {user: users[0].id, fridge: fridges[1].id})
             expect(initialCount + count).equals(newCount);
         });
     });

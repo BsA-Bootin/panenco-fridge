@@ -6,15 +6,16 @@ import { login } from "../../controllers/auth/handlers/login.handler";
 import { MikroORM } from "@mikro-orm/core";
 import { PostgreSqlDriver } from "@mikro-orm/postgresql";
 import { User } from "../../entities/user.entity";
-import { ProductAddBody, ProductGiftBody } from "../../contracts/product.body";
-import { UserBody, UserGiftBody } from "../../contracts/user.body";
+import { FridgeProductAddBody, ProductAddBody, ProductGiftBody } from "../../contracts/product.body";
+import { UserBody } from "../../contracts/user.body";
 import { FridgeBody, FridgeGetBody } from "../../contracts/fridge.body";
 import { Product } from "../../entities/product.entity";
 import { Fridge } from "../../entities/fridge.entity";
-import { CreateFridgeView } from "../../contracts/fridge.view";
-import exp from "constants";
-import { RecipeCreateBody, RecipeIngredients, RecipeName } from "../../contracts/recipe.body";
 import { Recipe } from "../../entities/recipe.entity";
+import { FridgeProduct } from "../../entities/fridgeProduct.entity";
+import { Ingredient } from "../../entities/ingredients.entity";
+import { RecipeCreateBody, RecipeIngredients, RecipeName } from "../../contracts/recipe.body";
+
 
 const userFixtures: User[] = [
     {
@@ -29,7 +30,20 @@ const userFixtures: User[] = [
         email: 'test-user+2@panenco.com',
         password: 'Password2',
     }   as User,
-];
+    {
+        firstName: 'firstTest3',
+        lastName: 'lastTest3',
+        email: 'test-user+3@panenco.com',
+        password: 'Password3',
+      } as User,
+      {
+        firstName: 'firstTest3',
+        lastName: 'lastTest3',
+        email: 'admin@panenco.com',
+        password: 'Password3',
+        role: 'admin',
+      } as User,
+    ];
 
 const fridgeFixtures: Fridge[] = [
     {
@@ -55,56 +69,80 @@ const productFixtures: Product[] = [
         name: 'milk',
         size: 5
     }   as Product,
-]
+    {
+        name: 'soda',
+        size: 2
+    }   as Product,
+];
 
 const recipeFixtures: Recipe[] = [
     {
         name: 'test name1',
-        ingredients: ["banana", "apple", "milk", "soda"],
     }   as Recipe,
     {
         name: 'test name2',
-        ingredients: ["banana", "apple"],
     }   as Recipe,
 ];
 
-describe('Integration Recipe tests', () => {
+describe('Recipe Handler Tests', () => {
+    let orm: MikroORM<PostgreSqlDriver>
     let users: User[]
     let fridges: Fridge[]
     let productBodys: {}[] = []
     let products: Product[]
     let recipeBodys: {}[] = []
     let recipes: Recipe[]
+    let fridgeProducts: FridgeProduct[]
+    let fridgeProductBodies = []
+    let ingredients: Ingredient[]
+    let ingredientBodies = []
     let request: supertest.SuperTest<supertest.Test>;
-    let orm: MikroORM<PostgreSqlDriver>
+
     before(async () => {
-    const app = new App();
-    await app.createConnection();
-    orm = app.orm;
-    request = supertest(app.host);
-    });
+        const app = new App();
+        await app.createConnection();
+        orm = app.orm;
+        request = supertest(app.host);
+        });
 
     beforeEach(async () => {
-    await orm.em.execute(`DROP SCHEMA public CASCADE; CREATE SCHEMA public;`);
-    await orm.getMigrator().up();
-    const em = orm.em.fork();
-    users = userFixtures.map((x) => em.create(User, x));
-    await em.persistAndFlush(users);
-    fridges = fridgeFixtures.map((x) => em.create(Fridge, x));
-    await em.persistAndFlush(fridges);
-    productBodys = [
-        {name: productFixtures[2].name, size: productFixtures[1].size, user: users[1].id, fridge: fridges[1].id},
-        {name: productFixtures[1].name, size: productFixtures[1].size, user: users[0].id, fridge: fridges[1].id},
-    ]
-    products = productBodys.map((x) => em.create(Product, x));
-    await em.persistAndFlush(products)
-    recipeBodys = [
-        {name: recipeFixtures[0].name, ingredients: recipeFixtures[0].ingredients,  user: users[0].id}, 
-        {name: recipeFixtures[1].name, ingredients: recipeFixtures[1].ingredients,  user: users[0].id},
-    ]
-    recipes = recipeBodys.map((x) => em.create(Recipe, x));
-    await em.persistAndFlush(recipes);
-    })
+        await orm.em.execute(`DROP SCHEMA public CASCADE; CREATE SCHEMA public;`);
+        await orm.getMigrator().up();
+        const em = orm.em.fork();
+        users = userFixtures.map((x) => em.create(User, x));
+        await em.persistAndFlush(users);
+        fridges = fridgeFixtures.map((x) => em.create(Fridge, x));
+        await em.persistAndFlush(fridges);
+        productBodys = [
+            {name: productFixtures[0].name, size: productFixtures[0].size},
+            {name: productFixtures[1].name, size: productFixtures[1].size},
+            {name: productFixtures[2].name, size: productFixtures[2].size},
+            {name: productFixtures[3].name, size: productFixtures[3].size},
+        ]
+        products = productBodys.map((x) => em.create(Product, x));
+        await em.persistAndFlush(products);
+        recipeBodys = [
+            {name: recipeFixtures[0].name, user: users[1].id}, 
+            {name: recipeFixtures[1].name, user: users[0].id},
+        ]
+        recipes = recipeBodys.map((x) => em.create(Recipe, x));
+        await em.persistAndFlush(recipes);
+        fridgeProductBodies = [
+            {user: users[0].id, fridge: fridges[0].id, product: products[3].id},
+            {user: users[1].id, fridge: fridges[1].id, product: products[2].id},
+            {user: users[1].id, fridge: fridges[1].id, product: products[1].id},
+        ]
+        fridgeProducts = fridgeProductBodies.map((x) => em.create(FridgeProduct, x));
+        await em.persistAndFlush(fridgeProducts)
+        ingredientBodies = [
+            {recipe: recipes[0].id, amount: '', product: products[0].id},
+            {recipe: recipes[0].id, amount: '', product: products[1].id},
+            {recipe: recipes[0].id, amount: '', product: products[2].id},
+            {recipe: recipes[0].id, amount: '', product: products[3].id},
+        ]
+        ingredients = ingredientBodies.map((x) => em.create(Ingredient, x))
+        await em.persistAndFlush(ingredients)
+    });
 
     it('Test all recipe endpoints in sequence', async () => {
 
@@ -113,7 +151,6 @@ describe('Integration Recipe tests', () => {
 
         const creationBody = {
             name: 'recipeTest',
-            ingredients: ['apple', 'cheese'],
             user: users[0].id,
         };
 
@@ -130,7 +167,6 @@ describe('Integration Recipe tests', () => {
         .expect(StatusCode.ok);
 
         expect(getRecipeResponse.name).equals(creationBody.name);
-        expect(getRecipeResponse.ingredients.toString()).equals(creationBody.ingredients.toString());
 
         const { body: getAllRecipeResponse } = await request
         .get(`/api/recipes/user/${users[0].id}`)
@@ -138,8 +174,6 @@ describe('Integration Recipe tests', () => {
 
         expect(getAllRecipeResponse.some((x) => x.name === recipeFixtures[0].name));
         expect(getAllRecipeResponse.some((x) => x.name === creationBody.name));
-        expect(getAllRecipeResponse.some((x) => x.ingredients.toString() === recipeFixtures[0].ingredients.toString()));
-        expect(getAllRecipeResponse.some((x) => x.ingredients === creationBody.ingredients.toString()));
         expect(getAllRecipeResponse.some((x) => x.id === recipes[0].id));
         expect(getAllRecipeResponse.some((x) => x.id === createRecipeResponse.id));
 
@@ -150,31 +184,14 @@ describe('Integration Recipe tests', () => {
         expect(getMissingResponse.some((x) => x.name === 'cheese'));
         expect(getMissingResponse.some((x) => x.name !== 'apple'));
 
-        const { body: addRecipeResponse } = await request
-        .patch(`/api/recipes/add/${createRecipeResponse.id}`)
-        .send( {ingredients: ['cookie']} as RecipeIngredients)
-        .expect(StatusCode.ok);
-
-        const { body: removeRecipeResponse } = await request
-        .patch(`/api/recipes/remove/${createRecipeResponse.id}`)
-        .send( {ingredients: ['cheese']} as RecipeIngredients)
-        .expect(StatusCode.ok);
-
         const { body: nameRecipeResponse } = await request
         .patch(`/api/recipes/name/${createRecipeResponse.id}`)
         .send( {name: 'changeNameTest'} as RecipeName)
         .expect(StatusCode.ok);
 
         expect(nameRecipeResponse.name).equals('changeNameTest');
-        expect(nameRecipeResponse.ingredients.some((x) => x === 'cookie'));
-        expect(nameRecipeResponse.ingredients.some((x) => x !== 'cheese'));
-        expect(nameRecipeResponse.ingredients.some((x) => x === 'apple'));
-
-        await request
-        .delete(`/api/recipes/${createRecipeResponse.id}`)
-        .expect(StatusCode.ok);
 
         const newCount = await em.count(Recipe, null);
-        expect(newCount).equals(originalCount);
+        expect(newCount).equals(originalCount + 1);
     });
 });

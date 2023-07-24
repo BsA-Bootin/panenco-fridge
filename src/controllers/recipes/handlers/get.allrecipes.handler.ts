@@ -7,7 +7,6 @@ import { Recipe } from "../../../entities/recipe.entity";
 
 export const getAllRecipes = async (userId: string) => {
     const em = RequestContext.getEntityManager();
-    const recipes = await em.findOneOrFail(User, userId);
-    await recipes.recipes.init();
-    return recipes.recipes.getItems();
+    const recipes = await em.find(Recipe, {user: userId});
+    return recipes;
 };

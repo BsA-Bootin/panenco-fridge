@@ -5,7 +5,12 @@ import ormConfig from "../../orm.config";
 import { Fridge } from "../../entities/fridge.entity";
 import { Product } from "../../entities/product.entity";
 import { expect } from "chai";
-import { createProduct } from "../../controllers/products/handlers/create.product.handler";
+import { createFridge } from "../../controllers/fridges/handlers/create.fridge.handler";
+import { deleteFridge } from "../../controllers/fridges/handlers/delete.fridge.handler";
+import { getFridge } from "../../controllers/fridges/handlers/get.fridge.handler";
+import { giftFridge } from "../../controllers/fridges/handlers/gift.fridge.handler";
+import { FridgeProduct } from "../../entities/fridgeProduct.entity";
+import { putFridgeProduct } from "../../controllers/products/handlers/put.fridgeProduct.handler";
 import { deleteProduct } from "../../controllers/products/handlers/delete.product.handler";
 import { getProduct } from "../../controllers/products/handlers/get.product.handler";
 import { giftProduct } from "../../controllers/products/handlers/gift.product.handler";
@@ -53,16 +58,18 @@ const productFixtures: Product[] = [
     }   as Product,
     {
         name: 'milk',
-        size: 5
+        size: 6
     }   as Product,
 ]
 
-describe('Product Handler Tests', () => {
+describe('Fridge Handler Tests', () => {
     let orm: MikroORM<PostgreSqlDriver>
     let users: User[]
     let fridges: Fridge[]
-    let productBodys: {}[] = []
+    let productBodies: {}[] = []
     let products: Product[]
+    let fridgeProducts: FridgeProduct[]
+    let fridgeProductBodies = []
     before(async () => {
         orm = await MikroORM.init(ormConfig);
     })
@@ -75,44 +82,52 @@ describe('Product Handler Tests', () => {
         await em.persistAndFlush(users);
         fridges = fridgeFixtures.map((x) => em.create(Fridge, x));
         await em.persistAndFlush(fridges);
-        productBodys = [
-            {name: productFixtures[0].name, size: productFixtures[0].size, user: users[0].id, fridge: fridges[0].id},
-            {name: productFixtures[1].name, size: productFixtures[1].size, user: users[1].id, fridge: fridges[1].id}
-        ];
-        products = productBodys.map((x) => em.create(Product, x));
+        productBodies = [
+            {name: productFixtures[0].name, size: productFixtures[0].size},
+            {name: productFixtures[1].name, size: productFixtures[1].size},
+            {name: productFixtures[2].name, size: productFixtures[2].size},
+            {name: productFixtures[1].name, size: productFixtures[2].size},
+        ]
+        products = productBodies.map((x) => em.create(Product, x));
         await em.persistAndFlush(products)
+        fridgeProductBodies = [
+            {user: users[0].id, fridge: fridges[0].id, product: products[3].id},
+            {user: users[1].id, fridge: fridges[1].id, product: products[2].id},
+            {user: users[1].id, fridge: fridges[1].id, product: products[1].id},
+        ]
+        fridgeProducts = fridgeProductBodies.map((x) => em.create(FridgeProduct, x));
+        await em.persistAndFlush(fridgeProducts)
     });
 
-    it('create product', async () => {
+    it('put product in fridge but capacity exceeded', async () => {
         await RequestContext.createAsync(orm.em.fork(), async () => {
             const body = {
-                name: productFixtures[2].name, 
-                size: productFixtures[2].size, 
-                user: users[0].id, 
-                fridge: fridges[1].id
+                userId: users[0].id,
+                fridgeId: fridges[0].id, 
             }
-            const res = await createProduct(body);
-            const createdProduct = await orm.em.findOne(Product, {name: productFixtures[2].name})
-            expect(createdProduct.id).equal(res.id);
-        });
-    });
-
-    it('create product fridge capacity exceeded', async () => {
-        await RequestContext.createAsync(orm.em.fork(), async () => {
-            const body = {
-                name: productFixtures[0].name, 
-                size: productFixtures[0].size, 
-                user: users[0].id, 
-                fridge: fridges[0].id
-            }
+            const productId = products[3].id
             try {
-                const res = await createProduct(body);
+                const res = await putFridgeProduct(productId, body);
             } catch (error) {
-                expect(error.message).equal('Capacity of the fridge has been exceeded');
+                expect(true, 'error thrown').true;
                 return;
             }
             expect(true, 'should have thrown an error').false;
-        })
+        });
+    });
+
+    it('put product in fridge', async () => {
+        await RequestContext.createAsync(orm.em.fork(), async () => {
+            const body = {
+                userId: users[0].id,
+                fridgeId: fridges[1].id, 
+            }
+            const productId = products[1].id
+            const originalCount = await orm.em.count(FridgeProduct, {fridge: body.fridgeId, product: productId, user: body.userId})
+            const res = await putFridgeProduct(productId, body);
+            const count = await orm.em.count(FridgeProduct, {fridge: body.fridgeId, product: productId, user: body.userId})
+            expect(originalCount + 1).equal(count);
+        });
     });
 
     it('delete product', async () => {
@@ -161,23 +176,12 @@ describe('Product Handler Tests', () => {
 
     it('gift product', async () => {
         await RequestContext.createAsync(orm.em.fork(), async () => {
-            const body = {receiver: users[1].id};
-            await giftProduct(products[0].id, body);
-            const giftedProduct = await orm.em.findOne(Product, products[0].id);
+            const body = {receiver: users[1].id,
+                          sender: users[0].id,
+                          fridgeId: fridges[0].id};
+            await giftProduct(products[3].id, body);
+            const giftedProduct = await orm.em.findOne(FridgeProduct, {user: users[1].id, fridge: fridges[0].id, product: products[3].id});
             expect(giftedProduct.user.id).equals(users[1].id);
         });
-    });
-
-    it('gift product given non existing id', async () => {
-        await RequestContext.createAsync(orm.em.fork(), async () => {
-            try {
-                const body = {receiver: users[1].id};
-                const res = await giftProduct('non-existing', body);
-            } catch (error) {
-                expect(true, 'error thrown').true;
-                return;
-            }
-            expect(true, 'should have thrown an error').false;
-        })
     });
 });

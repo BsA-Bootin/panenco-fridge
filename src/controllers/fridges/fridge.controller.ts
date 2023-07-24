@@ -19,7 +19,6 @@ export class FridgeController {
   @Get("/:id")
   @ArrayRepresenter(ProductView, StatusCode.ok)
   @OpenAPI({ summary: 'Get all products from fridge'})
-  @Authorized()
   async getFridge(@Param('id') fridgeId: string, @Body() body: FridgeGetBody) {
     return getFridge(fridgeId, body);
   }
@@ -27,7 +26,6 @@ export class FridgeController {
   @Post()
   @Representer(CreateFridgeView, StatusCode.created)
   @OpenAPI({ summary: 'Create a new Fridge'})
-  @Authorized(adminRequirement)
   async createFridge(@Body() body: FridgeBody) {
     return createFridge(body);
   }
@@ -43,6 +41,6 @@ export class FridgeController {
   @Representer(null, StatusCode.ok)
   @OpenAPI({ summary: 'delete products from a fridge'})
   async deleteProduct(@Param('id') fridgeId: string, @Query() query: SearchQuery) {
-    return deleteFridge(fridgeId, query.search);
+    return deleteFridge(fridgeId, query.userId);
   }
 }

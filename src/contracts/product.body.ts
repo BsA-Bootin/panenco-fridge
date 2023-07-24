@@ -7,17 +7,25 @@ export class ProductAddBody {
   
   @IsNumber()
   public size: number;
+}
 
+export class FridgeProductAddBody {
   @IsString()
-  public user: string;
-
+  public fridgeId: string;
+  
   @IsString()
-  public fridge: string;
+  public userId: string;
 }
 
 export class ProductGiftBody {
     @IsString()
     public receiver: string;
+
+    @IsString()
+    public sender: string;
+
+    @IsString()
+    public fridgeId: string;
 }
 
 export class ProductDeleteBody {

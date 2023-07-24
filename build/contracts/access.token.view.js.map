@@ -1,0 +1,1 @@
+{"version":3,"file":"access.token.view.js","sourceRoot":"","sources":["../../src/contracts/access.token.view.ts"],"names":[],"mappings":";;;;;;;;;;;;AAAA,yDAAoD;AACpD,qDAAqD;AAI9C,IAAM,eAAe,6BAArB,MAAM,eAAe;CAS3B,CAAA;AALU;IAFN,IAAA,0BAAM,GAAE;IACR,IAAA,0BAAQ,GAAE;;8CACS;AAIb;IAFN,IAAA,0BAAM,GAAE;IACR,IAAA,0BAAQ,GAAE;;kDACa;0BARf,eAAe;IAD3B,IAAA,2BAAO,GAAE;GACG,eAAe,CAS3B"}

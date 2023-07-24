@@ -18,21 +18,6 @@ export class ProductView {
 }
 
 @Exclude()
-export class ProductExtraView {
-  @Expose()
-  public name: string;
-
-  @Expose()
-  public size: number;
-
-  @Expose()
-  public fridge: string;
-
-  @Expose()
-  public id: string;
-}
-
-@Exclude()
 export class ProductCreateView {
   @Expose()
   public id: string;

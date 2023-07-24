@@ -4,14 +4,15 @@ import { Product } from "../../../entities/product.entity";
 import { User } from "../../../entities/user.entity";
 import { SearchQuery } from "../../../contracts/search.query";
 import { FridgeGiftBody } from "../../../contracts/fridge.body";
+import { FridgeProduct } from "../../../entities/fridgeProduct.entity";
 
 
 export const giftFridge = async (fridgeId: string, body: FridgeGiftBody) => {
     const em = RequestContext.getEntityManager();
-    const products = await em.find(Product, {user: body.sender, fridge: fridgeId});
+    const fridgeProducts = await em.find(FridgeProduct, {user: body.sender, fridge: fridgeId});
     const user = await em.findOneOrFail(User, body.receiver);
-    products.forEach(async product => {
-        product.assign({user: user})
+    fridgeProducts.forEach(async fridgeProduct => {
+        wrap(fridgeProduct).assign({user: user})
     });
     await em.flush();
 };
